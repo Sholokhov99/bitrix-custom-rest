@@ -2,59 +2,114 @@
 
 namespace DS\Rest\Http;
 
-use Bitrix\Main\Diag\Debug;
 use DS\Rest\Actions\Base as ActionBase;
 use DS\Rest\Application;
 use DS\Rest\Result;
+use DS\Rest\Interfaces\Http\RouteInterface;
+use DS\Rest\Interfaces\BaseInterface;
+use Bitrix\Main\Localization\Loc;
 
-class Routs
+class Routs implements RouteInterface, BaseInterface
 {
+    /**
+     * Разделитель пространства имен от метода обработки rest запроса
+     * @var string
+     */
     public const SPLICE_METHOD = "@";
 
+    /**
+     * Разделитель пути до класса обработчика rest запроса
+     * @var string
+     */
     public const SPLICE_PATH = ":";
 
-    public const DEFAULT_FOLDER_ACTIONS = "actions";
+    /**
+     * Наименование стандартной папки хранения огбработчиков rest запроса
+     * @var string
+     */
+    public const DEFAULT_FOLDER_ACTIONS = "Actions";
 
+    /**
+     * Метод стандартной точки входа
+     * @var string
+     */
     public const DEFAULT_METHOD_ACTION = "run";
 
+    /**
+     * Производить валидацию метода
+     * @var bool
+     */
     public bool $callValidate = true;
 
-    public ?ActionBase $action;
+    /**
+     * Обработчик rest запроса
+     * @var ActionBase|null
+     */
+    protected ?ActionBase $action;
 
-    public array $request;
+    /**
+     * HTTP запрос
+     * @var Request
+     */
+    protected Request $request;
 
-    public string $namespaceAction;
+    /**
+     * Пространство имен в котором происходит обработка rest апроса
+     * @var string
+     */
+    protected string $namespaceAction;
 
-    public string $methodNameCheckAccess;
+    /**
+     * Название метода, в котором происходит проверка доступа к обработчику rest запроса
+     * @var string
+     */
+    protected string $methodNameCheckAccess;
 
-    public string $methodAction;
+    /**
+     * Название метода, в котором происходит обработка rest запроса
+     * @var string
+     */
+    protected string $methodAction;
 
-    public string $keyNamespaceAction;
+    /**
+     * Ключ массива в котором хранится путь обработчика rest запроса
+     * @var string
+     */
+    protected string $keyNamespaceAction;
 
-    public bool $outerAction;
-
-    public function __construct(array $request)
+    public function __construct(Request $request)
     {
         $this->request = $request;
         $this->keyNamespaceAction = "action";
-        $this->outerAction = $this->isOuterAction();
         $this->methodNameCheckAccess = "checkAccess";
 
-        $this->parsingAction();
+        $this->run();
     }
 
-    public function isOuterAction(): bool
+    /**
+     * Проверка на использование стандартного метода обработки rest запроса
+     * @return bool
+     */
+    public function isDefaultMethod(): bool
     {
-        return strripos($this->getActionValue(), static::SPLICE_METHOD) !== false;
+        return strripos($this->getActionValue(), static::SPLICE_METHOD) === false;
     }
 
+    /**
+     * Получение стандартного пространства имен
+     * @return string
+     */
     public function getDefaultNamespace(): string
     {
         $reflectionClass = new \ReflectionClass(Application::class);
         return $reflectionClass->getNamespaceName() . "\\" . static::DEFAULT_FOLDER_ACTIONS;
     }
 
-    public function parsingAction(): string
+    /**
+     * Запуск механизма определения обработчика
+     * @return bool
+     */
+    public function run(): bool
     {
         $actionPath = $this->getActionValue();
 
@@ -64,21 +119,30 @@ class Routs
             ? static::DEFAULT_METHOD_ACTION
             : end($namespaceCollection);
 
-        if ($this->isOuterAction()) {
-            $this->namespaceAction = reset($namespaceCollection);
-        } else {
+        if ($this->isDefaultMethod()) {
             $this->namespaceAction = $this->getDefaultNamespace() . '\\' . reset($namespaceCollection);
+        } else {
+            $this->namespaceAction = reset($namespaceCollection);
         }
+
         $this->namespaceAction = str_replace(static::SPLICE_PATH, '\\', $this->namespaceAction);
 
-        return $this->namespaceAction;
+        return true;
     }
 
+    /**
+     * Проверка на существование обработчика rest запроса
+     * @return bool
+     */
     public function isMethodExits(): bool
     {
-        return class_exists($this->namespaceAction) && method_exists($this->namespaceAction, $this->methodAction);
+        return class_exists($this->getNamespaceActionName()) && method_exists($this->getNamespaceActionName(), $this->methodAction);
     }
 
+    /**
+     * Вызов метода обработчика rest запроса с его валидацией
+     * @return Result
+     */
     public function call(): Result
     {
         $result = new Result();
@@ -104,25 +168,53 @@ class Routs
         return $result;
     }
 
+    /**
+     * Получение названия метода обработки rest запроса
+     * @return string
+     */
     public function getMethodAction(): string
     {
-        return $this->methodAction ?? "";
+        return $this->methodAction ?? '';
     }
 
+    /**
+     * Получение пространства имен обработчика rest запроса
+     * @return string
+     */
+    public function getNamespaceActionName(): string
+    {
+        return $this->namespaceAction ?? '';
+    }
+
+    /**
+     * Получение обработчика rest запроса
+     * @return ActionBase|null
+     */
     public function getAction(): ?ActionBase
     {
         return $this->action ?? null;
     }
 
+    /**
+     * Получение строки маршрутизации rest запроса
+     * @return string
+     */
     public function getActionValue(): string
     {
-        if (isset($this->request[$this->keyNamespaceAction]) === false || is_string($this->request[$this->keyNamespaceAction]) === false) {
-            $this->request[$this->keyNamespaceAction] = "";
+        $requestData = $this->request->getData();
+        if (isset($requestData[$this->keyNamespaceAction]) === false || is_string($requestData[$this->keyNamespaceAction]) === false) {
+            return '';
         }
 
-        return $this->request[$this->keyNamespaceAction];
+        return $requestData[$this->keyNamespaceAction];
     }
 
+    /**
+     * @todo Потом переделать механизм проверки, чтобы она проходила в классу security
+     * Указание названия функции, которая проверяет доступа к обработчику
+     * @param string $method
+     * @return bool
+     */
     public function setMethodNameCheckAccess(string $method): bool
     {
         $method = trim($method);
@@ -143,11 +235,11 @@ class Routs
         $result = new Result();
 
         if ($this->isMethodExits() === false) {
-            $result->setError('Отсутствует декларированный исполнитель');
+            $result->setError(Loc::getMessage('REST_ROUTE_ERROR_NOT_FOUND_METHOD_ACTION'));
             return $result;
         }
 
-        $this->action = new $this->namespaceAction;
+        $this->action = new $this->getNamespaceActionName();
 
         $resultCheckAccess = $this->checkAccess();
         if ($resultCheckAccess->isSuccess() === false) {
@@ -169,21 +261,19 @@ class Routs
     protected function checkAccess(): Result
     {
         $result = new Result();
-        return $result;
-        $action = $this->getAction();
 
-        if (is_null($action)) {
-            $result->setError('Не зарегистрирован экземпляр класаа исполнителя');
+        if (is_null($this->getAction())) {
+            $result->setError(Loc::getMessage('REST_ROUTE_ERROR_NOT_FOUND_ACTION'));
             return $result;
         }
 
         if (method_exists(get_class($this->action), $this->methodNameCheckAccess) === false) {
-            $result->setError('Отсутствует защита веб-хука');
+            $result->setError(Loc::getMessage('REST_ROUTE_ERROR_NOT_FOUND_SECURE_ACTION'));
             return $result;
         }
 
         if ($this->action->{$this->methodNameCheckAccess}() === false) {
-            $result->setError('Ошибка доступа');
+            $result->setError(Loc::getMessage('REST_ROUTE_ERROR_FORBIDDEN'));
             return $result;
         }
 
@@ -200,12 +290,12 @@ class Routs
         $method = "validate{$this->getMethodAction()}";
 
         if (method_exists(get_class($this->getAction()), $method) === false) {
-            $result->setError('Отсутствует валидация у метода');
+            $result->setError(Loc::getMessage('REST_ROUTE_ERROR_EMPTY_VALIDATE_METHOD'));
             return $result;
         }
 
         if ($this->getAction()->{$method}() === false) {
-            $result->setError('Ошибка валидации');
+            $result->setError(Loc::getMessage('REST_ROUTE_ERROR_VALIDATE'));
             return $result;
         }
 

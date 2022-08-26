@@ -1,6 +1,6 @@
 <?php
 
-namespace DS\Rest\Heplers;
+namespace DS\Rest\Helpers;
 
 use Bitrix\Main\Localization\Loc;
 use DS\Rest\Result;

@@ -13,7 +13,7 @@ class Rest
     public function __construct()
     {
         $request = new Http\Request();
-        $this->route = new Http\Routs($request->getData());
+        $this->route = new Http\Routs($request);
 
         $this->run();
     }
