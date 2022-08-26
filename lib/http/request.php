@@ -3,33 +3,44 @@
 namespace DS\Rest\Http;
 
 use DS\Rest\Helpers;
+use DS\Rest\Interfaces\BaseInterface;
 use Bitrix\Main\Application;
-use Bitrix\Main\Web\Json;
 use Bitrix\Main\HttpRequest;
-use Bitrix\Main\ArgumentException;
 
-class Request
+class Request implements BaseInterface
 {
+    /**
+     * Http запрос
+     * @var HttpRequest
+     */
     public HttpRequest $request;
 
+    /**
+     * Входные данные http запроса
+     * @var array
+     */
     protected array $dataCollection;
 
     public function __construct()
     {
         $this->request = Application::getInstance()->getContext()->getRequest();
-        $this->dataCollection = $this->run();
+        $this->run();
     }
 
+    /**
+     * Получение массива данных входящего http запроса
+     * @return array
+     */
     public function getData(): array
     {
-        if (isset($this->dataCollection) === false) {
-            $this->dataCollection = [];
-        }
-
-        return $this->dataCollection;
+        return $this->dataCollection ?? [];
     }
 
-    public function run(): array
+    /**
+     * Получение массива данных запроса
+     * @return bool
+     */
+    public function run(): bool
     {
         $result = [];
 
@@ -39,10 +50,11 @@ class Request
 
         $resultJsonValidation = Helpers\Str::jsonValidate(HttpRequest::getInput());
         if ($resultJsonValidation->isSuccess()) {
-            array_merge($result, $resultJsonValidation->getData());
+            $result = array_merge($result, $resultJsonValidation->getData());
         }
         unset($resultJsonValidation);
+        $this->dataCollection = $result;
 
-        return $result;
+        return true;
     }
 }
