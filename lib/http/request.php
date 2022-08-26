@@ -2,7 +2,7 @@
 
 namespace DS\Rest\Http;
 
-use DS\Rest\Heplers;
+use DS\Rest\Helpers;
 use Bitrix\Main\Application;
 use Bitrix\Main\Web\Json;
 use Bitrix\Main\HttpRequest;
@@ -17,7 +17,7 @@ class Request
     public function __construct()
     {
         $this->request = Application::getInstance()->getContext()->getRequest();
-        $this->dataCollection = $this->parsingData();
+        $this->dataCollection = $this->run();
     }
 
     public function getData(): array
@@ -29,7 +29,7 @@ class Request
         return $this->dataCollection;
     }
 
-    protected function parsingData(): array
+    public function run(): array
     {
         $result = [];
 
@@ -37,7 +37,7 @@ class Request
             ? $this->request->getPostList()->toArray()
             : $this->request->getQueryList()->toArray();
 
-        $resultJsonValidation = Heplers\Str::jsonValidate(HttpRequest::getInput());
+        $resultJsonValidation = Helpers\Str::jsonValidate(HttpRequest::getInput());
         if ($resultJsonValidation->isSuccess()) {
             array_merge($result, $resultJsonValidation->getData());
         }
