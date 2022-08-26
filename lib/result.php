@@ -14,6 +14,6 @@ class Result extends Main\Result
      */
     public function setError(string $message, int $code = 0): self
     {
-        return $this->addError(new Error($message, $code));
+        return $this->addError(new Main\Error($message, $code));
     }
 }

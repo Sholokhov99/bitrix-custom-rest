@@ -20,6 +20,12 @@ class Rest
 
     public function run(): bool
     {
-        return true;
+        $result = $this->route->call();
+
+        /**
+         * @todo Добавить логику
+         */
+
+        return $result->isSuccess();
     }
 }
